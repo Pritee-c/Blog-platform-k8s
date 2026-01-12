@@ -11,9 +11,9 @@ import uuid
 app = Flask(__name__)
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:password@localhost/blog_cms'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://blog_user:BlogPass123!@localhost/blog_cms'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your-secret-key-change-in-production'
+app.config['JWT_SECRET_KEY'] = 'blog-cms-secret-key-2026-super-secure'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -26,6 +26,33 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 db = SQLAlchemy(app)
 cors = CORS(app)
 jwt = JWTManager(app)
+
+# Add request logging
+@app.before_request
+def log_request_info():
+    if request.method == 'POST' and 'posts' in request.path:
+        print(f"=== INCOMING REQUEST ===")
+        print(f"Method: {request.method}")
+        print(f"Path: {request.path}")
+        print(f"Headers: {dict(request.headers)}")
+        print(f"Content Type: {request.content_type}")
+        print(f"Authorization Header: {request.headers.get('Authorization', 'MISSING')}")
+
+# JWT error handlers
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    print("JWT TOKEN EXPIRED")
+    return jsonify({'error': 'Token has expired'}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    print(f"INVALID JWT TOKEN: {error}")
+    return jsonify({'error': 'Invalid token'}), 422
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    print(f"MISSING JWT TOKEN: {error}")
+    return jsonify({'error': 'Authorization token required'}), 401
 
 # Models
 class User(db.Model):
@@ -95,7 +122,7 @@ def login():
     user = User.query.filter_by(email=data['email']).first()
     
     if user and check_password_hash(user.password_hash, data['password']):
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
             'user': {
@@ -128,7 +155,7 @@ def register():
     db.session.add(user)
     db.session.commit()
     
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
     return jsonify({
         'access_token': access_token,
         'user': {
@@ -202,42 +229,74 @@ def get_post(post_id):
 @app.route('/api/posts', methods=['POST'])
 @jwt_required()
 def create_post():
-    user_id = get_jwt_identity()
-    data = request.get_json()
-    
-    slug = create_slug(data['title'])
-    # Ensure unique slug
-    counter = 1
-    original_slug = slug
-    while Post.query.filter_by(slug=slug).first():
-        slug = f"{original_slug}-{counter}"
-        counter += 1
-    
-    post = Post(
-        title=data['title'],
-        slug=slug,
-        content=data['content'],
-        excerpt=data.get('excerpt'),
-        featured_image=data.get('featured_image'),
-        status=data.get('status', 'draft'),
-        author_id=user_id,
-        category_id=data.get('category_id'),
-        meta_title=data.get('meta_title'),
-        meta_description=data.get('meta_description')
-    )
-    
-    if post.status == 'published':
-        post.published_at = datetime.utcnow()
-    
-    db.session.add(post)
-    db.session.commit()
-    
-    return jsonify({'message': 'Post created successfully', 'post_id': post.id}), 201
+    try:
+        print("=== CREATE POST FUNCTION CALLED ===")
+        print("Request method:", request.method)
+        print("Request headers:", dict(request.headers))
+        
+        user_id = int(get_jwt_identity())
+        print("User ID from JWT:", user_id)
+        
+        data = request.get_json()
+        print("Received JSON data:", data)
+        print("Request data type:", type(data))
+        
+        # Validate required fields
+        if not data.get('title') or not data.get('title').strip():
+            return jsonify({'error': 'Title is required'}), 422
+        
+        content = data.get('content', '').strip()
+        # Check for empty content or just empty HTML tags
+        if not content or content in ['<p><br></p>', '<p></p>', '<br>', '']:
+            return jsonify({'error': 'Content is required'}), 422
+        
+        slug = create_slug(data['title'])
+        # Ensure unique slug
+        counter = 1
+        original_slug = slug
+        while Post.query.filter_by(slug=slug).first():
+            slug = f"{original_slug}-{counter}"
+            counter += 1
+        
+        # Handle category_id - convert empty string to None
+        category_id = data.get('category_id')
+        if category_id == '' or category_id == 'null':
+            category_id = None
+        elif category_id:
+            try:
+                category_id = int(category_id)
+            except (ValueError, TypeError):
+                category_id = None
+        
+        post = Post(
+            title=data['title'].strip(),
+            slug=slug,
+            content=content,
+            excerpt=data.get('excerpt', '').strip() if data.get('excerpt') else None,
+            featured_image=data.get('featured_image'),
+            status=data.get('status', 'draft'),
+            author_id=user_id,
+            category_id=category_id,
+            meta_title=data.get('meta_title', '').strip() if data.get('meta_title') else None,
+            meta_description=data.get('meta_description', '').strip() if data.get('meta_description') else None
+        )
+        
+        if post.status == 'published':
+            post.published_at = datetime.utcnow()
+        
+        db.session.add(post)
+        db.session.commit()
+        
+        return jsonify({'message': 'Post created successfully', 'post_id': post.id}), 201
+        
+    except Exception as e:
+        print("Error creating post:", str(e))
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/posts/<int:post_id>', methods=['PUT'])
 @jwt_required()
 def update_post(post_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     post = Post.query.get_or_404(post_id)
     
     # Check if user owns the post or is admin
@@ -281,7 +340,7 @@ def update_post(post_id):
 @app.route('/api/posts/<int:post_id>', methods=['DELETE'])
 @jwt_required()
 def delete_post(post_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     post = Post.query.get_or_404(post_id)
     
     # Check if user owns the post or is admin
@@ -302,6 +361,15 @@ def get_categories():
         'slug': cat.slug,
         'description': cat.description
     } for cat in categories])
+
+# Test endpoint to check JWT authentication
+@app.route('/api/test-auth', methods=['GET'])
+@jwt_required()
+def test_auth():
+    print("=== TEST AUTH ENDPOINT CALLED ===")
+    user_id = int(get_jwt_identity())
+    print("User ID from JWT:", user_id)
+    return jsonify({'message': 'Authentication working', 'user_id': user_id})
 
 @app.route('/api/categories', methods=['POST'])
 @jwt_required()
