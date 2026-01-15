@@ -47,17 +47,19 @@ pipeline {
             steps {
                 echo '========== Pushing images to Docker Hub =========='
                 script {
+
+
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: '[Credentials]')]) {
-                        sh '''
-                            docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-                            docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
-                            docker push ${BACKEND_IMAGE}:latest
-                            docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
-                            docker push ${FRONTEND_IMAGE}:latest
-                            docker logout
-                        '''
-                    }
-                }
+                    sh """
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
+                    docker push ${BACKEND_IMAGE}:latest
+                    docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                    docker push ${FRONTEND_IMAGE}:latest
+                    docker logout
+                    """
+    }
+}
             }
         }
         
@@ -112,4 +114,6 @@ pipeline {
         }
     }
 }
+
+
 
