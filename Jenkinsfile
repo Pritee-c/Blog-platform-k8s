@@ -17,32 +17,39 @@ pipeline {
             }
         }
         
-        stage('Build Backend Image') {
-            steps {
-                echo '========== Building Backend Docker Image =========='
-                script {
-                    sh '''
-                        cd backend
-                        docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} .
-                        docker tag ${BACKEND_IMAGE}:${IMAGE_TAG} ${BACKEND_IMAGE}:latest
-                    '''
+        stage('Build Images') {
+            parallel {
+
+                stage('Build Backend Image') {
+                    steps {
+                        sh '''
+                            cd backend
+                            docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} .
+                            docker tag ${BACKEND_IMAGE}:${IMAGE_TAG} ${BACKEND_IMAGE}:latest
+                        '''
+                    }
+                }
+
+                stage('Build Frontend Image') {
+                    steps {
+                        sh '''
+                            cd frontend
+                            docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} .
+                            docker tag ${FRONTEND_IMAGE}:${IMAGE_TAG} ${FRONTEND_IMAGE}:latest
+                        '''
+                    }
                 }
             }
         }
-        
-        stage('Build Frontend Image') {
+
+        stage('Image Security Scan') {
             steps {
-                echo '========== Building Frontend Docker Image =========='
-                script {
-                    sh '''
-                        cd frontend
-                        docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} .
-                        docker tag ${FRONTEND_IMAGE}:${IMAGE_TAG} ${FRONTEND_IMAGE}:latest
-                    '''
-                }
+                sh '''
+                    trivy image --severity HIGH,CRITICAL --exit-code 1 ${BACKEND_IMAGE}:${IMAGE_TAG}
+                    trivy image --severity HIGH,CRITICAL --exit-code 1 ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                '''
             }
         }
-        
         stage('Push Images to Docker Hub') {
             steps {
                 echo '========== Pushing images to Docker Hub =========='
@@ -59,9 +66,16 @@ pipeline {
             }
         }
         
+        stage('K8s Precheck') {
+            steps {
+                sh '''
+                    kubectl get ns ${K8S_NAMESPACE} || kubectl create ns ${K8S_NAMESPACE}
+                '''
+            }
+        }
         stage('Deploy to Kubernetes') {
             steps {
-                echo '========== Updating Application Deployments =========='
+                echo '========== Deploying to Kubernetes =========='
                 script {
                     sh '''
                         # Update backend deployment with new image
@@ -102,7 +116,11 @@ pipeline {
             echo 'Access app via NodePort or LoadBalancer'
         }
         failure {
-            echo '========== ❌ Deployment Failed =========='
+            echo '========== ❌ Deployment Failed. Rolling back =========='
+            sh '''
+                kubectl rollout undo deployment/backend -n ${K8S_NAMESPACE} || true
+                kubectl rollout undo deployment/frontend -n ${K8S_NAMESPACE} || true
+            '''
         }
         always {
             echo '========== Cleaning up =========='
@@ -110,4 +128,3 @@ pipeline {
         }
     }
 }
-
