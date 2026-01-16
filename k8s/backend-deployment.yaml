@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: priteecha/blog-backend:latest
+        image: AWS_ID.dkr.ecr.us-east-1.amazonaws.com/blog-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
