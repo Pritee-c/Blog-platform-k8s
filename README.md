@@ -19,7 +19,7 @@ A production-style, containerized 3-tier Blog CMS designed to simulate real-worl
          ↑
     Public Access (*.elb.amazonaws.com)
 
-Container Images: AWS ECR (335853528110.dkr.ecr.us-east-1.amazonaws.com)
+Container Images: AWS ECR (AWS_ID.dkr.ecr.us-east-1.amazonaws.com)
 CI/CD: Jenkins → ECR → EKS
 ```
 
@@ -192,7 +192,7 @@ kubectl get svc frontend-service -n blog-app
 
 ## 🐳 Container Images (ECR)
 
-**ECR Registry:** `335853528110.dkr.ecr.us-east-1.amazonaws.com`
+**ECR Registry:** `AWS_ID.dkr.ecr.us-east-1.amazonaws.com`
 
 Build and push to ECR:
 
@@ -268,10 +268,6 @@ kubectl get nodes
 ### File Upload
 - `POST /api/upload` - Upload image (requires auth)
 - `GET /api/uploads/:filename` - Get uploaded file
-
-## 🛠️ Troubleshooting
-
-Common issues and solutions are documented in [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ### Quick Checks
 
