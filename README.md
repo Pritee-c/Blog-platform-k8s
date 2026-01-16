@@ -1,23 +1,26 @@
-# Blog CMS - Kubernetes Deployment
+# Blog CMS - EKS Deployment with ECR
 
-A production-ready, containerized 3-tier Blog/Content Management System deployed on Kubernetes with CI/CD pipeline.
+A production-ready, containerized 3-tier Blog/Content Management System deployed on **Amazon EKS** with **ECR** registry and **Jenkins CI/CD** pipeline.
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Kubernetes Cluster                        │
-│  ┌────────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │   Frontend     │  │   Backend    │  │    MySQL     │   │
-│  │  (React+Nginx) │→ │   (Flask)    │→ │  (StatefulSet)│   │
-│  │   2 replicas   │  │  2 replicas  │  │  Persistent   │   │
-│  │   Port: 80     │  │  Port: 5000  │  │  Port: 3306   │   │
-│  └────────────────┘  └──────────────┘  └──────────────┘   │
-│         ↑                                                    │
-│    NodePort :32743                                          │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    AWS EKS Cluster (blog-eks)                    │
+│  ┌────────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │   Frontend     │  │   Backend    │  │    MySQL     │        │
+│  │  (React+Nginx) │→ │   (Flask)    │→ │  (StatefulSet)│        │
+│  │   2 replicas   │  │  2 replicas  │  │  EBS Storage │        │
+│  │   Port: 80     │  │  Port: 5000  │  │  Port: 3306  │        │
+│  └────────────────┘  └──────────────┘  └──────────────┘        │
+│         ↑                                                         │
+│    AWS LoadBalancer (ELB)                                        │
+└──────────────────────────────────────────────────────────────────┘
          ↑
-    Load Balancer / Public Access
+    Public Access (*.elb.amazonaws.com)
+
+Container Images: AWS ECR (335853528110.dkr.ecr.us-east-1.amazonaws.com)
+CI/CD: Jenkins → ECR → EKS
 ```
 
 ## ✨ Features
@@ -35,59 +38,89 @@ A production-ready, containerized 3-tier Blog/Content Management System deployed
 
 ### DevOps Features
 - 🐳 Docker containerization (multi-stage builds)
-- ☸️ Kubernetes orchestration
-- 📦 Helm-ready configuration
-- 🔄 CI/CD with Jenkins
+- ☸️ **Amazon EKS** orchestration
+- 📦 **AWS ECR** for container registry
+- 🔄 CI/CD with **Jenkins** (automated builds & deployments)
 - 🌐 Nginx reverse proxy
-- 📊 Service mesh ready
-- 🔒 Secrets management
-- 💾 Persistent storage for MySQL
+- 💾 **EBS persistent storage** for MySQL
+- 🔒 AWS Secrets management
+- 🚀 Auto-scaling ready
+- 📊 CloudWatch monitoring ready
 
-## 🚀 Quick Start
+## 🚀 Quick Start (EKS Deployment)
 
 ### Prerequisites
-- Kubernetes cluster (v1.28+)
-- kubectl configured
-- Docker Hub account (or private registry)
-- kubectl CLI installed
+- **AWS Account** with ECR and EKS access
+- **AWS CLI** configured (`aws configure`)
+- **eksctl** installed
+- **kubectl** CLI installed
+- **Jenkins** server with AWS credentials
 
-### Deploy to Kubernetes
+### Step 1: Create EKS Cluster
 
-1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/blog-cms-k8s.git
-cd blog-cms-k8s
+eksctl create cluster \
+  --name blog-eks \
+  --region us-east-1 \
+  --nodes 2 \
+  --node-type t3.small \
+  --with-oidc \
+  --managed
+
+# Install EBS CSI Driver (for persistent storage)
+eksctl create addon \
+  --cluster blog-eks \
+  --name aws-ebs-csi-driver \
+  --region us-east-1 \
+  --force
 ```
 
-2. **Create namespace:**
+### Step 2: Create ECR Repositories
+
 ```bash
+aws ecr create-repository --repository-name blog-backend --region us-east-1
+aws ecr create-repository --repository-name blog-frontend --region us-east-1
+```
+
+### Step 3: Push Images to ECR
+
+```bash
+# Get AWS Account ID
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Login to ECR
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+
+# Pull from Docker Hub and push to ECR
+docker pull priteecha/blog-backend:latest
+docker tag priteecha/blog-backend:latest $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-backend:latest
+docker push $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-backend:latest
+
+docker pull priteecha/blog-frontend:latest
+docker tag priteecha/blog-frontend:latest $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-frontend:latest
+docker push $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-frontend:latest
+```
+
+### Step 4: Deploy to EKS
+
+```bash
+# Update kubeconfig
+aws eks update-kubeconfig --name blog-eks --region us-east-1
+
+# Deploy all resources
 kubectl apply -f k8s/namespace.yaml
-```
-
-3. **Deploy MySQL with storage:**
-```bash
-kubectl apply -f k8s/storageclass.yaml
-kubectl apply -f k8s/mysql-storage.yaml
 kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/mysql-storage.yaml
 kubectl apply -f k8s/mysql-init-configmap.yaml
 kubectl apply -f k8s/mysql-deployment.yaml
-```
-
-4. **Deploy Backend:**
-```bash
-kubectl apply -f k8s/configmap.yaml
 kubectl apply -f k8s/backend-deployment.yaml
-```
-
-5. **Deploy Frontend:**
-```bash
 kubectl apply -f k8s/frontend-deployment.yaml
-```
 
-6. **Access the application:**
-```bash
-kubectl get svc -n blog-app
-# Access via NodePort: http://<node-ip>:32743
+# Get LoadBalancer URL
+kubectl get svc frontend-service -n blog-app
+# Access via: http://<EXTERNAL-IP>.elb.amazonaws.com
 ```
 
 ### Default Credentials
@@ -157,30 +190,59 @@ kubectl get svc -n blog-app
 | backend | ClusterIP | 5000 | backend.blog-app.svc.cluster.local |
 | mysql-service | ClusterIP | 3306 | mysql-service.blog-app.svc.cluster.local |
 
-## 🐳 Docker Images
+## 🐳 Container Images (ECR)
 
-Build and push custom images:
+**ECR Registry:** `335853528110.dkr.ecr.us-east-1.amazonaws.com`
+
+Build and push to ECR:
 
 ```bash
-# Backend
-cd backend
-docker build -t yourusername/blog-backend:latest .
-docker push yourusername/blog-backend:latest
+# Get AWS Account ID
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# Frontend
+# Login to ECR
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+
+# Build and push Backend
+cd backend
+docker build -t $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-backend:latest .
+docker push $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-backend:latest
+
+# Build and push Frontend
 cd frontend
-docker build --build-arg REACT_APP_API_URL=/api -t yourusername/blog-frontend:latest .
-docker push yourusername/blog-frontend:latest
+docker build -t $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-frontend:latest .
+docker push $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/blog-frontend:latest
 ```
 
-## 🔄 CI/CD Pipeline
+## 🔄 CI/CD Pipeline (Jenkins + EKS + ECR)
 
-Jenkins pipeline stages:
-1. **Checkout** - Pull code from Git
-2. **Build Backend** - Build Flask Docker image
-3. **Build Frontend** - Build React Docker image
-4. **Push Images** - Push to Docker Hub
-5. **Deploy to K8s** - Update Kubernetes deployments
+**Jenkins Pipeline Stages:**
+1. **Checkout** - Pull code from GitHub
+2. **Build Images** - Build Backend & Frontend (parallel)
+3. **Security Scan** - Trivy vulnerability scanning (optional)
+4. **Push to ECR** - Push images to AWS ECR
+5. **K8s Precheck** - Update kubeconfig for EKS
+6. **Deploy to EKS** - Rolling update deployments
+7. **Verify** - Check pod/service status
+
+**Jenkins Setup:**
+```bash
+# On Jenkins EC2, configure AWS CLI
+aws configure
+
+# Update kubeconfig for EKS
+aws eks update-kubeconfig --name blog-eks --region us-east-1
+
+# Test access
+kubectl get nodes
+```
+
+**Jenkinsfile Key Features:**
+- Uses AWS IAM role (no hardcoded credentials)
+- Automated ECR login
+- Rolling updates with zero downtime
+- Automatic rollback on failure
 
 ## 📡 API Endpoints
 
@@ -207,6 +269,9 @@ Jenkins pipeline stages:
 - `POST /api/upload` - Upload image (requires auth)
 - `GET /api/uploads/:filename` - Get uploaded file
 
+## 🛠️ Troubleshooting
+
+Common issues and solutions are documented in [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ### Quick Checks
 
