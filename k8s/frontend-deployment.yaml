@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: priteecha/blog-frontend:latest
+        image: AWS_ID.dkr.ecr.us-east-1.amazonaws.com/blog-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
