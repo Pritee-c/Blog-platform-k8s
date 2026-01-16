@@ -1,6 +1,6 @@
 # Blog CMS - EKS Deployment with ECR
 
-A production-ready, containerized 3-tier Blog/Content Management System deployed on **Amazon EKS** with **ECR** registry and **Jenkins CI/CD** pipeline.
+A production-style, containerized 3-tier Blog CMS designed to simulate real-world Kubernetes deployment and troubleshooting scenarios.
 
 ## 🏗️ Architecture
 
