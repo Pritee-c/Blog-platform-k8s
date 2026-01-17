@@ -26,6 +26,15 @@ pipeline {
             steps {
                 echo '========== Checking out code =========='
                 checkout scm
+                
+                // Verify critical files after checkout
+                sh '''
+                    echo "=== Verifying Dockerfile has ENTRYPOINT fix ==="
+                    grep -n "ENTRYPOINT" gateway/Dockerfile || echo "WARNING: ENTRYPOINT not found!"
+                    
+                    echo "=== Git commit hash ==="
+                    git log --oneline -1
+                '''
             }
         }
         
