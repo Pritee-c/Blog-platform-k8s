@@ -219,6 +219,31 @@ pipeline {
             echo "API Gateway Image: ${GATEWAY_IMAGE}:${IMAGE_TAG}"
             echo "Frontend Image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
             echo 'Access app via LoadBalancer DNS'
+            
+            // Email notification on success
+            emailext(
+                subject: "✅ Jenkins Build #${BUILD_NUMBER} - SUCCESS",
+                body: """
+                    <h2>Build Successful!</h2>
+                    <p><strong>Job:</strong> ${JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${BUILD_NUMBER}</p>
+                    <p><strong>Build URL:</strong> <a href="${BUILD_URL}">${BUILD_URL}</a></p>
+                    
+                    <h3>Deployed Images:</h3>
+                    <ul>
+                        <li>Auth Service: ${AUTH_SERVICE_IMAGE}:${IMAGE_TAG}</li>
+                        <li>Post Service: ${POST_SERVICE_IMAGE}:${IMAGE_TAG}</li>
+                        <li>Comment Service: ${COMMENT_SERVICE_IMAGE}:${IMAGE_TAG}</li>
+                        <li>API Gateway: ${GATEWAY_IMAGE}:${IMAGE_TAG}</li>
+                        <li>Frontend: ${FRONTEND_IMAGE}:${IMAGE_TAG}</li>
+                    </ul>
+                    
+                    <p><strong>Status:</strong> All services deployed successfully to EKS!</p>
+                """,
+                mimeType: 'text/html',
+                to: '${DEFAULT_RECIPIENTS}',
+                recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+            )
         }
         failure {
             echo '========== ❌ Deployment Failed. Rolling back =========='
@@ -229,6 +254,26 @@ pipeline {
                 kubectl rollout undo deployment/api-gateway -n ${K8S_NAMESPACE} || true
                 kubectl rollout undo deployment/frontend -n ${K8S_NAMESPACE} || true
             '''
+            
+            // Email notification on failure
+            emailext(
+                subject: "❌ Jenkins Build #${BUILD_NUMBER} - FAILED",
+                body: """
+                    <h2 style="color: red;">Build Failed!</h2>
+                    <p><strong>Job:</strong> ${JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${BUILD_NUMBER}</p>
+                    <p><strong>Build URL:</strong> <a href="${BUILD_URL}">${BUILD_URL}</a></p>
+                    <p><strong>Console Output:</strong> <a href="${BUILD_URL}console">${BUILD_URL}console</a></p>
+                    
+                    <h3>Action Taken:</h3>
+                    <p>Automatic rollback initiated for all deployments</p>
+                    
+                    <p style="color: red;"><strong>Status:</strong> Build failed - please check logs</p>
+                """,
+                mimeType: 'text/html',
+                to: '${DEFAULT_RECIPIENTS}',
+                recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+            )
         }
         always {
             echo '========== Cleaning up =========='
