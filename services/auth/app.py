@@ -159,6 +159,26 @@ def get_current_user():
         logger.error(f"Get current user error: {str(e)}")
         return jsonify({'error': 'Server error'}), 500
 
+@app.route('/api/users/<int:user_id>', methods=['GET'])
+def get_user_by_id(user_id):
+    """Get user by ID (for inter-service communication)"""
+    try:
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Get user by ID error: {str(e)}")
+        return jsonify({'error': 'Server error'}), 500
+
 @app.route('/api/auth/validate', methods=['POST'])
 @jwt_required()
 def validate_token():
