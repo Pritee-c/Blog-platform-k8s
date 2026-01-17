@@ -23,6 +23,12 @@ RUN mkdir -p /var/log/nginx \
 # Copy nginx config
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Remove default nginx config to prevent entrypoint from trying to modify it
+RUN rm -rf /etc/nginx/conf.d/default.conf
+
+# Override entrypoint to bypass nginx docker entrypoint script
+ENTRYPOINT []
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget -qO- http://localhost:5000/health || exit 1

@@ -66,7 +66,7 @@ pipeline {
                     steps {
                         sh '''
                             cd gateway
-                            docker build -t ${GATEWAY_IMAGE}:${IMAGE_TAG} .
+                            docker build --no-cache -t ${GATEWAY_IMAGE}:${IMAGE_TAG} .
                             docker tag ${GATEWAY_IMAGE}:${IMAGE_TAG} ${GATEWAY_IMAGE}:latest
                         '''
                     }
