@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 import logging
 import re
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +18,9 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key')
+
+# Auth service URL
+AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:5001')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -74,6 +78,18 @@ def create_slug(title):
     """Convert title to URL-safe slug"""
     return re.sub(r'[^\w\s-]', '', title.lower()).replace(' ', '-')
 
+def get_author_details(author_id):
+    """Fetch author details from auth service"""
+    try:
+        response = requests.get(f'{AUTH_SERVICE_URL}/api/users/{author_id}', timeout=2)
+        if response.status_code == 200:
+            user_data = response.json()
+            return {'id': user_data['id'], 'username': user_data['username']}
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to fetch author {author_id}: {str(e)}")
+        return None
+
 # Routes
 @app.route('/health', methods=['GET'])
 def health():
@@ -91,8 +107,10 @@ def get_posts():
         query = Post.query.filter_by(status=status).order_by(Post.published_at.desc())
         posts = query.paginate(page=page, per_page=per_page, error_out=False)
         
-        return jsonify({
-            'posts': [{
+        # Enrich posts with author details
+        posts_data = []
+        for post in posts.items:
+            post_dict = {
                 'id': post.id,
                 'title': post.title,
                 'slug': post.slug,
@@ -104,7 +122,15 @@ def get_posts():
                 'category_id': post.category_id,
                 'created_at': post.created_at.isoformat(),
                 'published_at': post.published_at.isoformat() if post.published_at else None
-            } for post in posts.items],
+            }
+            # Fetch author details from auth service
+            author = get_author_details(post.author_id)
+            if author:
+                post_dict['author'] = author
+            posts_data.append(post_dict)
+        
+        return jsonify({
+            'posts': posts_data,
             'total': posts.total,
             'pages': posts.pages,
             'current_page': posts.page
