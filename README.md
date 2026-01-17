@@ -1,6 +1,6 @@
 # Blog CMS - EKS Deployment with ECR
 
-A production-style, containerized 3-tier Blog CMS designed to simulate real-world Kubernetes deployment and troubleshooting scenarios.
+A production-ready, containerized 3-tier Blog/Content Management System deployed on **Amazon EKS** with **ECR** registry and **Jenkins CI/CD** pipeline.
 
 ## 🏗️ Architecture
 
@@ -19,7 +19,7 @@ A production-style, containerized 3-tier Blog CMS designed to simulate real-worl
          ↑
     Public Access (*.elb.amazonaws.com)
 
-Container Images: AWS ECR (AWS_ID.dkr.ecr.us-east-1.amazonaws.com)
+Container Images: AWS ECR (335853528110.dkr.ecr.us-east-1.amazonaws.com)
 CI/CD: Jenkins → ECR → EKS
 ```
 
@@ -192,7 +192,7 @@ kubectl get svc frontend-service -n blog-app
 
 ## 🐳 Container Images (ECR)
 
-**ECR Registry:** `AWS_ID.dkr.ecr.us-east-1.amazonaws.com`
+**ECR Registry:** `335853528110.dkr.ecr.us-east-1.amazonaws.com`
 
 Build and push to ECR:
 
@@ -269,6 +269,10 @@ kubectl get nodes
 - `POST /api/upload` - Upload image (requires auth)
 - `GET /api/uploads/:filename` - Get uploaded file
 
+## 🛠️ Troubleshooting
+
+Common issues and solutions are documented in [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ### Quick Checks
 
 **1. Check pod status:**
@@ -322,9 +326,38 @@ kubectl port-forward -n blog-app svc/frontend-service 8080:80
 
 ## 📊 Monitoring & Logging
 
+### Prometheus + Grafana (Implemented ✅)
+
+Full monitoring stack deployed on your EKS cluster with real-time metrics visualization.
+
+**Features:**
+- ✅ Prometheus: Metrics collection from nodes, pods, and services
+- ✅ Grafana: Interactive dashboards and visualizations
+- ✅ AlertManager: Alert routing and notifications
+- ✅ node-exporter: Host metrics (CPU, memory, disk, network)
+- ✅ kube-state-metrics: Kubernetes object monitoring
+
+**Quick Start:**
+```bash
+# View Grafana dashboards
+# Access: http://<your-public-ip>:3001 (admin / admin123)
+
+# Access Prometheus queries
+# Open: http://<your-public-ip>:9090
+```
+
+**For complete setup and configuration, see:** [MONITORING.md](MONITORING.md)
+
+**Available Resources:**
+- Pre-built Kubernetes cluster monitoring dashboards
+- Custom blog platform metrics dashboards
+- Real-time queries on all cluster and service metrics
+- ServiceMonitors for auth, post, and comment services
+
+### EFK Stack (Recommended for Logs)
+
 **Recommended tools:**
-- Prometheus + Grafana for metrics
-- EFK Stack (Elasticsearch, Fluentd, Kibana) for logs
+- Elasticsearch + Fluentd + Kibana for logs
 - Jaeger for distributed tracing
 
 ## 🧪 Testing
@@ -355,9 +388,9 @@ docker-compose up
 
 For issues and questions:
 - Open an issue on GitHub
+- Check existing documentation
 - Review troubleshooting guide
 
 ---
 
 **Built with ❤️ using React, Flask, MySQL, Docker, and Kubernetes**
-# Force rebuild

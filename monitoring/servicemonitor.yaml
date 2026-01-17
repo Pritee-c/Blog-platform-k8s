@@ -1,0 +1,72 @@
+---
+# ServiceMonitor for Auth Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: auth-service-monitor
+  namespace: blog-app
+  labels:
+    app: auth-service
+spec:
+  selector:
+    matchLabels:
+      app: auth-service
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /health
+
+---
+# ServiceMonitor for Post Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: post-service-monitor
+  namespace: blog-app
+  labels:
+    app: post-service
+spec:
+  selector:
+    matchLabels:
+      app: post-service
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /health
+
+---
+# ServiceMonitor for Comment Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: comment-service-monitor
+  namespace: blog-app
+  labels:
+    app: comment-service
+spec:
+  selector:
+    matchLabels:
+      app: comment-service
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /health
+
+---
+# ServiceMonitor for API Gateway
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-gateway-monitor
+  namespace: blog-app
+  labels:
+    app: api-gateway
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /health
+

@@ -19,6 +19,9 @@ pipeline {
         // Kubernetes
         K8S_NAMESPACE = 'blog-app'
         K8S_CLUSTER = 'blog-eks'
+        
+        // Slack Webhook URL - add this as Jenkins credential
+        SLACK_WEBHOOK_URL = credentials('slack-webhook-url')
     }
     
     stages {
@@ -220,29 +223,26 @@ pipeline {
             echo "Frontend Image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
             echo 'Access app via LoadBalancer DNS'
             
-            // Email notification on success
-            emailext(
-                subject: "✅ Jenkins Build #${BUILD_NUMBER} - SUCCESS",
-                body: """
-                    <h2>Build Successful!</h2>
-                    <p><strong>Job:</strong> ${JOB_NAME}</p>
-                    <p><strong>Build Number:</strong> ${BUILD_NUMBER}</p>
-                    <p><strong>Build URL:</strong> <a href="${BUILD_URL}">${BUILD_URL}</a></p>
+            // Slack notification on success
+            slackSend(
+                color: 'good',
+                channel: '#deployments',
+                message: """
+                    ✅ *Build #${BUILD_NUMBER} - SUCCESS*
                     
-                    <h3>Deployed Images:</h3>
-                    <ul>
-                        <li>Auth Service: ${AUTH_SERVICE_IMAGE}:${IMAGE_TAG}</li>
-                        <li>Post Service: ${POST_SERVICE_IMAGE}:${IMAGE_TAG}</li>
-                        <li>Comment Service: ${COMMENT_SERVICE_IMAGE}:${IMAGE_TAG}</li>
-                        <li>API Gateway: ${GATEWAY_IMAGE}:${IMAGE_TAG}</li>
-                        <li>Frontend: ${FRONTEND_IMAGE}:${IMAGE_TAG}</li>
-                    </ul>
+                    *Job:* ${JOB_NAME}
+                    *Status:* All services deployed successfully to EKS
                     
-                    <p><strong>Status:</strong> All services deployed successfully to EKS!</p>
+                    *Images Deployed:*
+                    • Auth Service: ${AUTH_SERVICE_IMAGE}:${IMAGE_TAG}
+                    • Post Service: ${POST_SERVICE_IMAGE}:${IMAGE_TAG}
+                    • Comment Service: ${COMMENT_SERVICE_IMAGE}:${IMAGE_TAG}
+                    • API Gateway: ${GATEWAY_IMAGE}:${IMAGE_TAG}
+                    • Frontend: ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                    
+                    <${BUILD_URL}|View Build Details>
                 """,
-                mimeType: 'text/html',
-                to: '${DEFAULT_RECIPIENTS}',
-                recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+                webhookUrl: '${SLACK_WEBHOOK_URL}'
             )
         }
         failure {
@@ -255,24 +255,24 @@ pipeline {
                 kubectl rollout undo deployment/frontend -n ${K8S_NAMESPACE} || true
             '''
             
-            // Email notification on failure
-            emailext(
-                subject: "❌ Jenkins Build #${BUILD_NUMBER} - FAILED",
-                body: """
-                    <h2 style="color: red;">Build Failed!</h2>
-                    <p><strong>Job:</strong> ${JOB_NAME}</p>
-                    <p><strong>Build Number:</strong> ${BUILD_NUMBER}</p>
-                    <p><strong>Build URL:</strong> <a href="${BUILD_URL}">${BUILD_URL}</a></p>
-                    <p><strong>Console Output:</strong> <a href="${BUILD_URL}console">${BUILD_URL}console</a></p>
+            // Slack notification on failure
+            slackSend(
+                color: 'danger',
+                channel: '#deployments',
+                message: """
+                    ❌ *Build #${BUILD_NUMBER} - FAILED*
                     
-                    <h3>Action Taken:</h3>
-                    <p>Automatic rollback initiated for all deployments</p>
+                    *Job:* ${JOB_NAME}
+                    *Status:* Build failed - automatic rollback initiated
                     
-                    <p style="color: red;"><strong>Status:</strong> Build failed - please check logs</p>
+                    *Action Taken:*
+                    • All deployments rolled back to previous version
+                    • Check logs for details
+                    
+                    <${BUILD_URL}console|View Console Logs>
+                    <${BUILD_URL}|View Build Details>
                 """,
-                mimeType: 'text/html',
-                to: '${DEFAULT_RECIPIENTS}',
-                recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+                webhookUrl: '${SLACK_WEBHOOK_URL}'
             )
         }
         always {
