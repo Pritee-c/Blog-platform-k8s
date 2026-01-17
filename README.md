@@ -360,3 +360,4 @@ For issues and questions:
 ---
 
 **Built with ❤️ using React, Flask, MySQL, Docker, and Kubernetes**
+# Force rebuild
