@@ -22,5 +22,5 @@ data:
   MAX_FILE_SIZE: "16777216"
   
   # Database Connection (using MySQL ClusterIP directly - bypasses DNS)
-  DATABASE_URL: mysql+pymysql://blog_user:password@mysql-service:3306/blog_cms
+  DATABASE_URL: mysql+pymysql://blog_user:BlogPass123!@mysql-service:3306/blog_cms
 

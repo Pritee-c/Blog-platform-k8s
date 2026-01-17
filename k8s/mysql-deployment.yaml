@@ -69,11 +69,11 @@ spec:
           mountPath: /docker-entrypoint-initdb.d
         resources:
           requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
             memory: "512Mi"
             cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
         livenessProbe:
           exec:
             command:
@@ -104,7 +104,7 @@ spec:
     spec:
       accessModes:
       - ReadWriteOnce
-      storageClassName: manual
+      storageClassName: gp2
       resources:
         requests:
           storage: 5Gi
